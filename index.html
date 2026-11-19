@@ -32,7 +32,7 @@
     .cart-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
     .cart-info { font-size: 14px; flex: 1; padding-right: 8px; }
     .btn-del { background: #dc3545; color: #fff; border: none; border-radius: 4px; padding: 6px 10px; font-size: 12px; }
-    .status-bar { background: #e2e3e5; color: #383d41; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; font-weight: bold; }
+    .status-bar { background: #e2e3e5; color: #383d41; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; font-weight: bold; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -106,20 +106,29 @@
       if (savedName) document.getElementById('userName').value = savedName;
     } catch(e) {}
 
-    // マスタデータ取得
-    fetch(GAS_API_URL)
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        masterData = data || [];
-        stBar.style.background = '#d4edda';
-        stBar.style.color = '#155724';
-        stBar.innerText = '準備完了（マスタ登録数: ' + masterData.length + '件）';
-      })
-      .catch(function(err) {
-        stBar.style.background = '#f8d7da';
-        stBar.style.color = '#721c24';
-        stBar.innerText = 'マスタ読込エラー: GASのURL設定を確認してください';
-      });
+    if (GAS_API_URL.indexOf('https://google.com') !== 0) {
+      stBar.style.background = '#f8d7da';
+      stBar.style.color = '#721c24';
+      stBar.innerText = '設定未完了: index.html の GAS_API_URL にURLを貼り付けてください';
+    } else {
+      stBar.innerText = 'GASへ接続中...';
+      fetch(GAS_API_URL, { redirect: 'follow' })
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTPエラー: ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          masterData = data || [];
+          stBar.style.background = '#d4edda';
+          stBar.style.color = '#155724';
+          stBar.innerText = '準備完了（マスタ登録数: ' + masterData.length + '件）';
+        })
+        .catch(function(err) {
+          stBar.style.background = '#f8d7da';
+          stBar.style.color = '#721c24';
+          stBar.innerText = '通信エラー: ' + err.message;
+        });
+    }
 
     function toggleLiveScanner() {
       var container = document.getElementById('videoContainer');
@@ -150,7 +159,7 @@
           }
         ).catch(function(err) {
           stopLiveScanner();
-          alert('カメラを起動できませんでした。スマホのブラウザ設定でカメラを許可してください。');
+          alert('カメラを起動できませんでした: ' + err.message);
         });
       } catch (e) {
         stopLiveScanner();
@@ -201,19 +210,18 @@
         var item = masterData[i];
         if (item.barcode.toLowerCase().indexOf(q) !== -1 ||
             item.code.toLowerCase().indexOf(q) !== -1 ||
+
             item.name.toLowerCase().indexOf(q) !== -1 ||
-            item.maker.toLowerCase().indexOf(q) !== -1) {
-          currentMatches.push(item);
-          if (currentMatches.length >= 30) break;
-        }
-      }
-
-      if (currentMatches.length === 0) {
-        resDiv.innerHTML = '<div class="search-item" style="color:#888;">該当する商品がありません</div>';
-      } else {
-        var html = '';
-
-      for (var j = 0; j < currentMatches.length; j++) {
+item.maker.toLowerCase().indexOf(q) !== -1) {
+currentMatches.push(item);
+if (currentMatches.length >= 30) break;
+}
+}
+if (currentMatches.length === 0) {
+resDiv.innerHTML = '該当する商品がありません';
+} else {
+var html = '';
+for (var j = 0; j < currentMatches.length; j++) {
 var m = currentMatches[j];
 html += '' +
 '' + m.code + ' : ' + m.name + '
@@ -262,7 +270,7 @@ renderCart();
 function handlePhoto(event) {
 var files = event.target.files;
 if (!files || files.length === 0) return;
-var file = files[0];
+var file = files.item(0);
 var qtyStr = prompt('撮影した商品の「持出個数」を入力してください', '1');
 if (qtyStr === null) {
 event.target.value = '';
@@ -304,14 +312,14 @@ renderCart();
 }
 function renderCart() {
 document.getElementById('cartCount').innerText = cart.length;
-const listDiv = document.getElementById('cartList');
+var listDiv = document.getElementById('cartList');
 if (cart.length === 0) {
 listDiv.innerHTML = 'まだ商品が追加されていません。';
 return;
 }
-let html = '';
-for (let i = 0; i < cart.length; i++) {
-const item = cart[i];
+var html = '';
+for (var i = 0; i < cart.length; i++) {
+var item = cart[i];
 html += '' +
 '' +
 '' + item.code + ' / ' + item.name + '
@@ -344,6 +352,7 @@ btn.innerText = '送信中...';
 var payload = { userName: userName, projectNo: projectNo, projectName: projectName, items: cart };
 fetch(GAS_API_URL, {
 method: 'POST',
+redirect: 'follow',
 body: JSON.stringify(payload)
 })
 .then(function(res) { return res.json(); })
@@ -363,7 +372,6 @@ alert('エラー: ' + data.message);
 .catch(function(err) {
 btn.disabled = false;
 btn.innerText = '✅ この内容で持出確定';
-alert('送信エラーが発生しました: ' + err);
+alert('送信エラーが発生しました: ' + err.message);
 });
 }
-
